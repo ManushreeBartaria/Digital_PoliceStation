@@ -3,9 +3,8 @@ from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.utils.security import create_access_token, verify_password, verify_access_token
 from fastapi.security import OAuth2PasswordBearer
-from app.models.citizen import citizen, citizen_location
+from app.models.citizen import citizen
 from app.schemas.citizen import citizenCreate, citizenResponse, citizenAuth, citizenauthresponse
-from app.schemas.citizen import citizenlocationrequest, citizenlocationresponse
 from typing import List
 
 
@@ -36,24 +35,3 @@ def citizenauth(citizen_member: citizenAuth, db: Session = Depends(get_db)):
       raise HTTPException(status_code=401, detail="Invalid credentials")
     access_token = create_access_token({"citizen_id": member.citizen_id})
     return {"access_token": access_token, "token_type": "bearer"}
-
-@router.post("/citizenlocation", response_model=citizenlocationresponse)
-def update_location(location: citizenlocationrequest, user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
-    citizen_record = db.query(citizen).filter(citizen.citizen_id == location.citizen_id).first()
-    if not citizen_record:
-        raise HTTPException(status_code=404, detail="Citizen not found")
-    
-    location_record = db.query(citizen_location).filter(citizen_location.citizen_id == location.citizen_id).first()
-    if location_record:
-        location_record.latitude = location.latitude
-        location_record.longitude = location.longitude
-    else:
-        new_location = citizen_location(
-            citizen_id=location.citizen_id,
-            latitude=location.latitude,
-            longitude=location.longitude,
-        )
-        db.add(new_location)
-    
-    db.commit()
-    return {"message": "Location updated successfully"}

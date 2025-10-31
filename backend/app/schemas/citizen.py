@@ -32,20 +32,5 @@ class citizenauthresponse(BaseModel):
     model_config = {
         "from_attributes": True
     }    
-    
-class citizenlocationrequest(BaseModel):
-    citizen_id: int
-    latitude: float
-    longitude: float
-    
-    model_config = {
-        "from_attributes": True
-    }    
-    
-class citizenlocationresponse(BaseModel):
-    message: str
-    
-    model_config = {
-        "from_attributes": True
-    }    
+       
     

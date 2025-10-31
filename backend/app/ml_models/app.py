@@ -56,7 +56,7 @@ def create_map(lat, lon):
     return m._repr_html_()
 
 # Define the API endpoint that will handle the location data
-@app.post("/generate_map/")
+@app.post("/citizenlocation")
 def generate_map(location: Location):
     """
     Generates an HTML map with crime data centered on the provided latitude and longitude.
