@@ -1,0 +1,10 @@
+{
+    "version": "v1.0",
+    "rows": 2,
+    "region": "Rajasthan",
+    "loss": 1.043,
+    "global_step": 15,
+    "epoch": 5,
+    "timestamp": "2025-09-07T22:43:02.593934",
+    "notes": "Dry run complete. Placeholder-free. Ready for scale-up."
+}
