@@ -29,6 +29,9 @@ class PoliceAuth(BaseModel):
 class PoliceAuthResponse(BaseModel):
     access_token: str
     token_type: str
+    police_member_id: int
+    station_id: int
+    name: str
     
     model_config = {
         "from_attributes": True

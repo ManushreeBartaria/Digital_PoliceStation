@@ -18,23 +18,18 @@ export default function LoginPage() {
   const validate = () => {
     if (role === "citizen") {
       if (!form.aadhar_no || !form.password)
-        return "Aadhar and password are required";
+        return "Aadhar and password are required.";
     } else if (role === "police") {
       if (mode === "register") {
         if (!form.name || !form.password || !form.station_id)
-          return "Name, password and station ID required";
+          return "Name, password, and station ID are required.";
       } else {
         if (!form.station_id || !form.member_id || !form.password)
-          return "Station ID, Member ID and password required";
+          return "Station ID, Member ID, and password are required.";
       }
     } else if (role === "government") {
-      if (mode === "register") {
-        if (!form.government_member_id || !form.password)
-          return "Government Member ID and password are required";
-      } else {
-        if (!form.government_member_id || !form.password)
-          return "Government Member ID and password are required";
-      }
+      if (!form.government_member_id || !form.password)
+        return "Government Member ID and password are required.";
     }
     return null;
   };
@@ -54,14 +49,12 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const err = validate();
-    if (err) {
-      alert(err);
-      return;
-    }
+    if (err) return alert(err);
 
     setLoading(true);
     try {
       if (mode === "register") {
+        // -------- CITIZEN REGISTER --------
         if (role === "citizen") {
           await routes.addCitizen({
             aadhar_no: form.aadhar_no,
@@ -72,21 +65,41 @@ export default function LoginPage() {
             password: form.password,
           });
           navigate("/citizen");
-        } else if (role === "police") {
+        }
+
+        // -------- POLICE REGISTER --------
+        else if (role === "police") {
           const created = await routes.addPoliceMember({
             name: form.name,
             password: form.password,
             station_id: Number(form.station_id),
           });
-          const memberId =
-            created?.member_id || Number(form.member_id || 0);
-          await routes.policeAuth({
+          const memberId = created?.member_id || Number(form.member_id || 0);
+          const auth = await routes.policeAuth({
             station_id: Number(form.station_id),
             member_id: memberId,
             password: form.password,
           });
+
+          // Store officer details directly from backend
+          if (auth?.access_token) {
+            localStorage.setItem("token", auth.access_token);
+            localStorage.setItem("role", "police");
+            localStorage.setItem(
+              "user",
+              JSON.stringify({
+                name: auth.member_name,
+                station_id: auth.station_id,
+                member_id: auth.member_id,
+              })
+            );
+          }
+
           navigate("/police");
-        } else if (role === "government") {
+        }
+
+        // -------- GOVERNMENT REGISTER --------
+        else if (role === "government") {
           const created = await routes.addGovernment({
             government_member_id: Number(form.government_member_id),
             password: form.password,
@@ -96,26 +109,21 @@ export default function LoginPage() {
             localStorage.setItem("token", created.access_token);
             localStorage.setItem("role", "government");
             navigate("/government");
-            return;
-          }
-
-          if (created?.government_id) {
+          } else if (created?.government_id) {
             await routes.governmentAuth({
               government_member_id: Number(form.government_member_id),
               password: form.password,
             });
             navigate("/government");
-            return;
+          } else {
+            alert(
+              "Government account created successfully, but no token returned. Contact admin for verification."
+            );
+            navigate("/");
           }
-
-          alert(
-            "Government account created successfully, but server did not return credentials/token. " +
-              "Please contact admin for verification."
-          );
-          navigate("/");
         }
       } else {
-        // LOGIN
+        // -------- LOGIN MODE --------
         if (role === "citizen") {
           await routes.citizenAuth({
             aadhar_no: form.aadhar_no,
@@ -123,11 +131,26 @@ export default function LoginPage() {
           });
           navigate("/citizen");
         } else if (role === "police") {
-          await routes.policeAuth({
+          const auth = await routes.policeAuth({
             station_id: Number(form.station_id),
             member_id: Number(form.member_id),
             password: form.password,
           });
+
+          // Store officer details from backend
+          if (auth?.access_token) {
+            localStorage.setItem("token", auth.access_token);
+            localStorage.setItem("role", "police");
+            localStorage.setItem(
+              "user",
+              JSON.stringify({
+                name: auth.member_name,
+                station_id: auth.station_id,
+                member_id: auth.member_id,
+              })
+            );
+          }
+
           navigate("/police");
         } else if (role === "government") {
           const auth = await routes.governmentAuth({
@@ -161,6 +184,7 @@ export default function LoginPage() {
         alignItems: "center",
         justifyContent: "center",
         padding: 20,
+        background: "#f4f6f8",
       }}
     >
       <form
@@ -175,14 +199,19 @@ export default function LoginPage() {
           boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
         }}
       >
-        <h1 style={{ marginBottom: 12, fontSize: 22 }}>
+        <h1
+          style={{
+            textAlign: "center",
+            color: "#1f3a93",
+            fontSize: 24,
+            marginBottom: 16,
+          }}
+        >
           Digital Police Station
         </h1>
 
-        {/* Role selector */}
-        <label style={{ display: "block", marginBottom: 6, fontSize: 13 }}>
-          Role
-        </label>
+        {/* Role Selector */}
+        <label style={{ fontWeight: 600 }}>Role</label>
         <select
           value={role}
           onChange={(e) => {
@@ -191,11 +220,8 @@ export default function LoginPage() {
             setMode("login");
           }}
           style={{
-            width: "100%",
-            padding: "8px 10px",
+            ...inputStyle,
             marginBottom: 12,
-            borderRadius: 6,
-            border: "1px solid #ddd",
           }}
         >
           <option value="citizen">Citizen</option>
@@ -203,7 +229,7 @@ export default function LoginPage() {
           <option value="government">Government</option>
         </select>
 
-        {/* Toggle buttons */}
+        {/* Toggle Buttons */}
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
           <button
             type="button"
@@ -228,8 +254,7 @@ export default function LoginPage() {
               padding: 10,
               borderRadius: 6,
               border: "none",
-              backgroundColor:
-                mode === "register" ? "#1f3a93" : "#f0f0f0",
+              backgroundColor: mode === "register" ? "#1f3a93" : "#f0f0f0",
               color: mode === "register" ? "#fff" : "#111",
               cursor: "pointer",
             }}
@@ -238,7 +263,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {/* Citizen form */}
+        {/* Form Fields */}
         {role === "citizen" && (
           <>
             <label>Aadhar Number</label>
@@ -261,7 +286,6 @@ export default function LoginPage() {
           </>
         )}
 
-        {/* Police form */}
         {role === "police" && (
           <>
             {mode === "register" ? (
@@ -315,7 +339,6 @@ export default function LoginPage() {
           </>
         )}
 
-        {/* Government form */}
         {role === "government" && (
           <>
             <label>Government Member ID</label>
@@ -338,7 +361,7 @@ export default function LoginPage() {
           </>
         )}
 
-        {/* Submit button */}
+        {/* Submit */}
         <button
           type="submit"
           disabled={loading}
@@ -352,6 +375,7 @@ export default function LoginPage() {
             cursor: "pointer",
             opacity: loading ? 0.85 : 1,
             marginTop: 6,
+            fontWeight: 600,
           }}
         >
           {loading
