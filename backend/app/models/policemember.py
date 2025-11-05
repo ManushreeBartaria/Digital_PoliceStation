@@ -8,5 +8,5 @@ class PoliceMember(Base):
     member_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(100), nullable=False)
     password = Column(String(100), nullable=False)
-    station_id = Column(Integer, ForeignKey("PoliceStation.PSid"))
-    policestation = relationship("PoliceStation", back_populates="policemember")
+    station_id = Column(Integer,nullable=False)
+    

@@ -21,7 +21,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 
 @router.post("/addgovernment", response_model=governmentResponse)
 def add_government(member: govermentCreate, db: Session = Depends(get_db)):
-    new_member = government(government_id=member.government_id, password=member.password)
+    new_member = government(government_member_id=member.government_member_id,password=member.password)
     db.add(new_member)
     db.commit()
     db.refresh(new_member)
@@ -30,12 +30,11 @@ def add_government(member: govermentCreate, db: Session = Depends(get_db)):
 @router.post("/governmentAuth", response_model=governmentauthresponse)
 def governmentauth(government_member: governmentAuth, db: Session = Depends(get_db)):
     member = db.query(government).filter(
-    government.government_id == government_member.government_id,
     government.password == government_member.password
 ).first()
     if not member:
       raise HTTPException(status_code=401, detail="Invalid credentials")
-    access_token = create_access_token({"government_id": member.government_id})
+    access_token = create_access_token({"government_member_id": member.government_member_id})
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/governmentsearchfir", response_model=governmentsearchfirresponse)  

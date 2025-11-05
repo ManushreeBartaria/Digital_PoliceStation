@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 
 class citizenCreate(BaseModel):
-    citizen_id: int
     aadhar_no: str
     password: str
     

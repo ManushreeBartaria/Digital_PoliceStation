@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Optional, List
 from app.schemas.Fir import FirCreate
 class govermentCreate(BaseModel):
-    government_id: int
+    government_member_id:int
     password: str
     
     model_config = {
@@ -17,7 +17,7 @@ class governmentResponse(BaseModel):
     }
 
 class governmentAuth(BaseModel):
-    government_id: int
+    government_member_id:int
     password: str
     
     model_config = {

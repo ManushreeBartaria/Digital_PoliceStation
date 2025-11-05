@@ -4,8 +4,6 @@ from app.database.connection import get_db
 from app.utils.security import create_access_token, verify_password, verify_access_token
 from fastapi.security import OAuth2PasswordBearer
 from app.models.policemember import PoliceMember
-from app.models.policestation import PoliceStation
-from app.schemas.StationCreate import StationCreate, StationResponse
 from app.schemas.PoliceMemberCreate import PoliceMemberCreate, PoliceMemberResponse, PoliceAuth, PoliceAuthResponse, MemberDetails
 from typing import List
 
@@ -18,13 +16,6 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return payload
   
-@router.post("/policestationdetails", response_model=StationResponse)
-def policestationdetails(station: StationCreate, db: Session = Depends(get_db)):
-    new_station = PoliceStation(name=station.name, location=station.location)
-    db.add(new_station)
-    db.commit()
-    db.refresh(new_station)
-    return {"message": "Police station added successfully", "station_id": new_station.PSid}
 
 @router.post("/addpolicemember", response_model=PoliceMemberResponse)
 def add_policemember(member: PoliceMemberCreate, db: Session = Depends(get_db)):
