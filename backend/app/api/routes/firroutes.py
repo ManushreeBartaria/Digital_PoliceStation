@@ -15,14 +15,18 @@ from app.models.firregistation import FirRegistration, closedFir, FIRProgress, C
 from datetime import datetime
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
+from typing import Optional, List
 
 router = APIRouter()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/policeauth/policeauth")
+police_oauth = OAuth2PasswordBearer(tokenUrl="/policeauth/policeauth")
+citizen_oauth = OAuth2PasswordBearer(tokenUrl="/citizen/citizenAuth")
+
 SECRET_KEY = "hackathon-secret-key"
 ALGORITHM = "HS256"
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
+
+def get_current_police(token: str = Depends(police_oauth)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
@@ -38,8 +42,25 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+
+def get_current_citizen(token: str = Depends(citizen_oauth)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        citizen_id = payload.get("citizen_id")
+        aadhar_no = payload.get("aadhar_no")
+        if citizen_id is None or not aadhar_no:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return {"citizen_id": citizen_id, "aadhar_no": aadhar_no}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
 @router.post("/register_incident", response_model=FirResponse)
-def register_incident(report: FirCreate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+def register_incident(
+    report: FirCreate,
+    current_user: dict = Depends(get_current_police),
+    db: Session = Depends(get_db),
+):
     new_report = FirRegistration(
         id=None,
         fullname=report.fullname,
@@ -67,14 +88,19 @@ def register_incident(report: FirCreate, current_user: dict = Depends(get_curren
         "registered_by_name": current_user["name"],
     }
 
+
 @router.post("/add_progress", response_model=FIRProgressResponse)
-def add_progress(progress_update: FIRProgressUpdate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+def add_progress(
+    progress_update: FIRProgressUpdate,
+    current_user: dict = Depends(get_current_police),
+    db: Session = Depends(get_db),
+):
     fir = db.query(FirRegistration).filter(FirRegistration.id == progress_update.fir_id).first()
     if not fir:
         raise HTTPException(status_code=404, detail="FIR not found")
 
     culprit_id = None
-    if progress_update.culprit and progress_update.culprit.name:
+    if getattr(progress_update, "culprit", None) and progress_update.culprit.name:
         c = Culprit(
             fir_id=fir.id,
             station_id=fir.Stationid,
@@ -104,20 +130,18 @@ def add_progress(progress_update: FIRProgressUpdate, current_user: dict = Depend
     db.add(new_progress)
     db.commit()
 
-    records = (
-        db.query(FIRProgress)
-        .filter(FIRProgress.fir_id == fir.id)
-        .order_by(FIRProgress.id.desc())
-        .all()
+    records: List[FIRProgress] = (
+        db.query(FIRProgress).filter(FIRProgress.fir_id == fir.id).order_by(FIRProgress.id.desc()).all()
     )
     return {"progress": records}
+
 
 @router.post("/get_progress", response_model=FIRProgressResponse)
 def get_progress(progress_request: FIRProgressRequest, db: Session = Depends(get_db)):
     fir = db.query(FirRegistration).filter(FirRegistration.id == progress_request.fir_id).first()
     if not fir:
         raise HTTPException(status_code=404, detail="FIR not found")
-    records = (
+    records: List[FIRProgress] = (
         db.query(FIRProgress)
         .filter(FIRProgress.fir_id == progress_request.fir_id)
         .order_by(FIRProgress.id.desc())
@@ -125,19 +149,17 @@ def get_progress(progress_request: FIRProgressRequest, db: Session = Depends(get
     )
     return {"progress": records}
 
+
 @router.get("/details", response_model=FIRDetailsResponse)
 def get_fir_details(fir_id: str, db: Session = Depends(get_db)):
     f = db.query(FirRegistration).filter(FirRegistration.id == fir_id).first()
     if not f:
         raise HTTPException(status_code=404, detail="FIR not found")
     status_val = getattr(f, "status", "active")
-    progress = (
-        db.query(FIRProgress)
-        .filter(FIRProgress.fir_id == fir_id)
-        .order_by(FIRProgress.id.desc())
-        .all()
+    progress: List[FIRProgress] = (
+        db.query(FIRProgress).filter(FIRProgress.fir_id == fir_id).order_by(FIRProgress.id.desc()).all()
     )
-    culprits = db.query(Culprit).filter(Culprit.fir_id == fir_id).all()
+    culprits: List[Culprit] = db.query(Culprit).filter(Culprit.fir_id == fir_id).all()
     return {
         "fir_id": f.id,
         "fullname": f.fullname,
@@ -158,6 +180,7 @@ def get_fir_details(fir_id: str, db: Session = Depends(get_db)):
         "progress": progress,
         "culprits": culprits,
     }
+
 
 @router.post("/close_fir", response_model=FIRCloseResponse)
 def close_fir(close_request: FIRCloseRequest, db: Session = Depends(get_db)):
@@ -190,8 +213,9 @@ def close_fir(close_request: FIRCloseRequest, db: Session = Depends(get_db)):
     db.refresh(c)
     return {"message": "FIR closed successfully"}
 
+
 @router.get("/list")
-def list_all_firs(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_all_firs(current_user: dict = Depends(get_current_police), db: Session = Depends(get_db)):
     firs = db.query(FirRegistration).all()
     return [
         {
@@ -206,8 +230,9 @@ def list_all_firs(current_user: dict = Depends(get_current_user), db: Session = 
         for f in firs
     ]
 
+
 @router.get("/list_by_station")
-def list_firs_by_station(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+def list_firs_by_station(current_user: dict = Depends(get_current_police), db: Session = Depends(get_db)):
     station_id = current_user["station_id"]
     firs = db.query(FirRegistration).filter(FirRegistration.Stationid == station_id).all()
     active = [f for f in firs if getattr(f, "status", "active") != "closed"]
@@ -251,6 +276,7 @@ def list_firs_by_station(current_user: dict = Depends(get_current_user), db: Ses
         ],
     }
 
+
 @router.get("/search")
 def search_firs(q: str = Query(..., min_length=1), db: Session = Depends(get_db)):
     pattern = f"%{q}%"
@@ -275,3 +301,83 @@ def search_firs(q: str = Query(..., min_length=1), db: Session = Depends(get_db)
         }
         for f in results
     ]
+
+
+@router.get("/list_by_aadhar")
+def list_firs_for_citizen(current_citizen: dict = Depends(get_current_citizen), db: Session = Depends(get_db)):
+    aadhar = str(current_citizen["aadhar_no"]).strip()
+    firs = db.query(FirRegistration).filter(FirRegistration.id_proof_value == aadhar).all()
+    if not firs:
+        return []
+    closed_ids = {row.fir_id for row in db.query(closedFir).filter(closedFir.fir_id.in_([f.id for f in firs])).all()}
+    return [
+        {
+            "fir_id": f.id,
+            "fullname": f.fullname,
+            "offence_type": f.offence_type,
+            "incident_location": f.incident_location,
+            "incident_date": f.incident_date,
+            "status": "closed" if f.id in closed_ids else getattr(f, "status", "active"),
+            "station_id": f.Stationid,
+        }
+        for f in firs
+    ]
+
+
+@router.get("/detail/{fir_id}", response_model=FIRDetailsResponse)
+def citizen_or_police_fir_detail(
+    fir_id: str,
+    db: Session = Depends(get_db),
+    citizen_token: Optional[str] = Depends(citizen_oauth),
+    police_token: Optional[str] = Depends(police_oauth),
+):
+    f = db.query(FirRegistration).filter(FirRegistration.id == fir_id).first()
+    if not f:
+        raise HTTPException(status_code=404, detail="FIR not found")
+
+    authorized = False
+
+    if police_token:
+        try:
+            jwt.decode(police_token, SECRET_KEY, algorithms=[ALGORITHM])
+            authorized = True
+        except JWTError:
+            pass
+
+    if not authorized and citizen_token:
+        try:
+            payload = jwt.decode(citizen_token, SECRET_KEY, algorithms=[ALGORITHM])
+            aadhar = str(payload.get("aadhar_no", "")).strip()
+            if aadhar and aadhar == (f.id_proof_value or "").strip():
+                authorized = True
+        except JWTError:
+            pass
+
+    if not authorized:
+        raise HTTPException(status_code=403, detail="Not authorized to view this FIR")
+
+    status_val = getattr(f, "status", "active")
+    progress: List[FIRProgress] = (
+        db.query(FIRProgress).filter(FIRProgress.fir_id == fir_id).order_by(FIRProgress.id.desc()).all()
+    )
+    culprits: List[Culprit] = db.query(Culprit).filter(Culprit.fir_id == fir_id).all()
+    return {
+        "fir_id": f.id,
+        "fullname": f.fullname,
+        "age": f.age,
+        "gender": f.gender,
+        "address": f.address,
+        "contact_number": f.contact_number,
+        "id_proof_type": f.id_proof_type,
+        "id_proof_value": f.id_proof_value,
+        "incident_date": f.incident_date,
+        "incident_time": f.incident_time,
+        "offence_type": f.offence_type,
+        "incident_location": f.incident_location,
+        "case_narrative": f.case_narrative,
+        "station_id": f.Stationid,
+        "member_id": f.member_id,
+        "status": status_val,
+        "progress": progress,
+        "culprits": culprits,
+    }

@@ -7,6 +7,7 @@ function authHeaders() {
 }
 
 /* ====================== CITIZEN ====================== */
+/* ====================== CITIZEN ====================== */
 export async function addCitizen(payload) {
   try {
     const res = await api.post("/citizen/addcitizen", payload);
@@ -20,15 +21,31 @@ export async function citizenAuth(payload) {
   try {
     const res = await api.post("/citizen/citizenAuth", payload);
     const data = res.data;
+
     if (data?.access_token) {
       localStorage.setItem("token", data.access_token);
       localStorage.setItem("role", "citizen");
     }
+
+    // Save a minimal user profile for citizen
+    // (so the dashboard header and forms can read it)
+    if (data?.citizen_id || data?.aadhar_no) {
+      localStorage.setItem(
+        "user",
+        JSON.stringify({
+          name: "Citizen",
+          citizen_id: data.citizen_id ?? null,
+          aadhar_no: data.aadhar_no ?? "",
+        })
+      );
+    }
+
     return data;
   } catch (err) {
     throw err.response?.data || err;
   }
 }
+
 
 /* ====================== POLICE ====================== */
 export async function addPoliceMember(payload) {
@@ -184,6 +201,30 @@ export async function searchFIRs(query) {
   }
 }
 
+// --- add near your FIR routes ---
+export async function getCitizenFIRs() {
+  try {
+    const res = await api.get("/fir/list_by_aadhar", {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    return res.data; // [{ fir_id, fullname, offence_type, incident_location, status, incident_date }]
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+}
+
+export async function getFIRDetail(fir_id) {
+  try {
+    const res = await api.get(`/fir/detail/${encodeURIComponent(fir_id)}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    return res.data; // full FIR + latest progress
+  } catch (err) {
+    throw err.response?.data || err;
+  }
+}
+
+
 /* ====================== GOVERNMENT ====================== */
 export async function addGovernment(payload) {
   try {
@@ -232,6 +273,13 @@ export async function escalateFIR(payload) {
 
 /* ====================== EXPORT ====================== */
 const routes = {
+
+ 
+  getCitizenFIRs,
+  getFIRDetail,
+  escalateFIR, 
+
+
   // Citizen
   addCitizen,
   citizenAuth,

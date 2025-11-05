@@ -3,7 +3,6 @@ from pydantic import BaseModel
 class citizenCreate(BaseModel):
     aadhar_no: str
     password: str
-    
     model_config = {
         "from_attributes": True
     }
@@ -11,7 +10,6 @@ class citizenCreate(BaseModel):
 class citizenResponse(BaseModel):
     message: str
     citizen_id: int
-    
     model_config = {
         "from_attributes": True
     }
@@ -19,17 +17,15 @@ class citizenResponse(BaseModel):
 class citizenAuth(BaseModel):
     aadhar_no: str
     password: str
-    
     model_config = {
         "from_attributes": True
     }
-        
+
 class citizenauthresponse(BaseModel):
     access_token: str
     token_type: str
-    
+    citizen_id: int
+    aadhar_no: str
     model_config = {
         "from_attributes": True
-    }    
-       
-    
+    }
