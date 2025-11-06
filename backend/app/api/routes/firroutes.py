@@ -19,8 +19,10 @@ from typing import Optional, List
 
 router = APIRouter()
 
-police_oauth = OAuth2PasswordBearer(tokenUrl="/policeauth/policeauth")
-citizen_oauth = OAuth2PasswordBearer(tokenUrl="/citizen/citizenAuth")
+# OAuth schemes
+police_oauth = OAuth2PasswordBearer(tokenUrl="/policeauth")
+citizen_oauth = OAuth2PasswordBearer(tokenUrl="/citizenAuth")
+government_oauth = OAuth2PasswordBearer(tokenUrl="/governmentAuth")
 
 SECRET_KEY = "hackathon-secret-key"
 ALGORITHM = "HS256"
@@ -51,6 +53,20 @@ def get_current_citizen(token: str = Depends(citizen_oauth)):
         if citizen_id is None or not aadhar_no:
             raise HTTPException(status_code=401, detail="Invalid token")
         return {"citizen_id": citizen_id, "aadhar_no": aadhar_no}
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
+def get_current_government(token: str = Depends(government_oauth)):
+    """
+    Minimal check: token must decode and contain government_member_id.
+    """
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        gov_id = payload.get("government_member_id")
+        if not gov_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return {"government_member_id": gov_id}
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
@@ -215,7 +231,39 @@ def close_fir(close_request: FIRCloseRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/list")
-def list_all_firs(current_user: dict = Depends(get_current_police), db: Session = Depends(get_db)):
+def list_all_firs(
+    db: Session = Depends(get_db),
+    # Accept either a police or a government token:
+    police_token: Optional[str] = Depends(police_oauth),
+    government_token: Optional[str] = Depends(government_oauth),
+):
+    """
+    Authorized for:
+    - Police (any station)  -> full list
+    - Government            -> full list
+    """
+    authorized = False
+
+    # Try police token
+    if police_token:
+        try:
+            jwt.decode(police_token, SECRET_KEY, algorithms=[ALGORITHM])
+            authorized = True
+        except JWTError:
+            authorized = False
+
+    # If not police, try government token
+    if not authorized and government_token:
+        try:
+            payload = jwt.decode(government_token, SECRET_KEY, algorithms=[ALGORITHM])
+            if payload.get("government_member_id"):
+                authorized = True
+        except JWTError:
+            authorized = False
+
+    if not authorized:
+        raise HTTPException(status_code=401, detail="Not authorized")
+
     firs = db.query(FirRegistration).all()
     return [
         {

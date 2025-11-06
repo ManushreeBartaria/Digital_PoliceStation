@@ -83,3 +83,6 @@ class closedFir(Base):
     member_id = Column(Integer, ForeignKey("PoliceMember.member_id"))
 
     original_fir = relationship("FirRegistration", back_populates="closed_entry")
+
+
+

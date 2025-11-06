@@ -117,3 +117,7 @@ class FIRDetailsResponse(BaseModel):
     culprits: List[CulpritRecord]
 
     model_config = {"from_attributes": True}
+
+
+# -------- NEW: Escalation schemas --------
+

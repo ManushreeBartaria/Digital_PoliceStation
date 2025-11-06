@@ -74,26 +74,15 @@ export default function LoginPage() {
             password: form.password,
             station_id: Number(form.station_id),
           });
+
           const memberId = created?.member_id || Number(form.member_id || 0);
-          const auth = await routes.policeAuth({
+
+          // Auth (service stores token/user/role)
+          await routes.policeAuth({
             station_id: Number(form.station_id),
             member_id: memberId,
             password: form.password,
           });
-
-          // Store officer details directly from backend
-          if (auth?.access_token) {
-            localStorage.setItem("token", auth.access_token);
-            localStorage.setItem("role", "police");
-            localStorage.setItem(
-              "user",
-              JSON.stringify({
-                name: auth.member_name,
-                station_id: auth.station_id,
-                member_id: auth.member_id,
-              })
-            );
-          }
 
           navigate("/police");
         }
@@ -105,11 +94,8 @@ export default function LoginPage() {
             password: form.password,
           });
 
-          if (created?.access_token) {
-            localStorage.setItem("token", created.access_token);
-            localStorage.setItem("role", "government");
-            navigate("/government");
-          } else if (created?.government_id) {
+          // If backend returns government_id or access_token, perform auth via service
+          if (created?.government_id || created?.access_token) {
             await routes.governmentAuth({
               government_member_id: Number(form.government_member_id),
               password: form.password,
@@ -131,26 +117,11 @@ export default function LoginPage() {
           });
           navigate("/citizen");
         } else if (role === "police") {
-          const auth = await routes.policeAuth({
+          await routes.policeAuth({
             station_id: Number(form.station_id),
             member_id: Number(form.member_id),
             password: form.password,
           });
-
-          // Store officer details from backend
-          if (auth?.access_token) {
-            localStorage.setItem("token", auth.access_token);
-            localStorage.setItem("role", "police");
-            localStorage.setItem(
-              "user",
-              JSON.stringify({
-                name: auth.member_name,
-                station_id: auth.station_id,
-                member_id: auth.member_id,
-              })
-            );
-          }
-
           navigate("/police");
         } else if (role === "government") {
           const auth = await routes.governmentAuth({
@@ -158,8 +129,6 @@ export default function LoginPage() {
             password: form.password,
           });
           if (auth?.access_token) {
-            localStorage.setItem("token", auth.access_token);
-            localStorage.setItem("role", "government");
             navigate("/government");
           } else {
             alert("Invalid government credentials.");

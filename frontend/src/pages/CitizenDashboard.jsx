@@ -53,6 +53,16 @@ export default function CitizenDashboard() {
       .slice(0, 2)
       .join("") || "C";
 
+  // Auto-fill Aadhar into escalation form (read-only)
+  useEffect(() => {
+    try {
+      const u = JSON.parse(localStorage.getItem("user") || "{}");
+      if (u?.aadhar_no) {
+        setEscalate((p) => ({ ...p, aadhar_no: u.aadhar_no }));
+      }
+    } catch {}
+  }, []);
+
   // Load citizen FIRs
   useEffect(() => {
     const t = localStorage.getItem("token");
@@ -60,7 +70,6 @@ export default function CitizenDashboard() {
       logout();
       return;
     }
-
     (async () => {
       setLoading(true);
       try {
@@ -92,25 +101,48 @@ export default function CitizenDashboard() {
 
   const submitEscalation = async (e) => {
     e.preventDefault();
-    if (!escalate.fir_id.trim() || !escalate.aadhar_no.trim() || !escalate.reason.trim()) {
-      alert("Please fill FIR ID, Aadhar No and the reason to escalate.");
+    const firId = (escalate.fir_id || "").trim();
+    const reason = (escalate.reason || "").trim();
+    if (!firId || !reason) {
+      alert("Please fill FIR ID and the reason to escalate.");
       return;
     }
     setEscalating(true);
     try {
-      await routes.escalateFIR({
-        fir_id: escalate.fir_id.trim(),
-        aadhar_no: escalate.aadhar_no.trim(),
-        reason: escalate.reason.trim(),
-      });
+      // Uses citizen route: /citizen/escalatefir
+      await routes.escalateFIR({ fir_id: firId, reason });
       alert("Your escalation has been submitted.");
-      setEscalate({ fir_id: "", aadhar_no: "", reason: "" });
+      setEscalate((p) => ({ ...p, fir_id: "", reason: "" })); // keep aadhar_no
     } catch (err) {
       alert(err?.detail || err?.message || "Failed to escalate case");
     } finally {
       setEscalating(false);
     }
   };
+
+  // Prefill escalation FIR ID
+  const useForEscalation = (firId) => {
+    if (!firId) return;
+    setEscalate((p) => ({ ...p, fir_id: String(firId) }));
+    const el = document.getElementById("escalation-reason");
+    if (el) el.focus();
+  };
+
+  // Button styled to match your "Search" button size/feel
+  const SearchSizedBlueBtn = ({ onClick, children = "Escalate", title }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title || "Use this FIR in the escalation form below"}
+      style={btnSearchSizedBlue}
+      onMouseEnter={(e) => (e.currentTarget.style.background = "#203a9b")}
+      onMouseLeave={(e) => (e.currentTarget.style.background = "#1f3fae")}
+      onMouseDown={(e) => (e.currentTarget.style.transform = "translateY(1px)")}
+      onMouseUp={(e) => (e.currentTarget.style.transform = "translateY(0)")}
+    >
+      {children}
+    </button>
+  );
 
   return (
     <div className="dashboard-container">
@@ -187,32 +219,42 @@ export default function CitizenDashboard() {
                     onClick={() => openDetail(f)}
                     title={`FIR #${f.fir_id}`}
                   >
-                    <div style={{ fontWeight: 700 }}>
-                      {f.offence_type ? `${f.offence_type} — ${f.fullname}` : `FIR #${f.fir_id}`}
-                    </div>
-                    <div style={{ display: "flex", gap: 10, fontSize: 12, color: "#666" }}>
-                      <span>#{f.fir_id}</span>
-                      <span>• {f.incident_location || "—"}</span>
-                      <span>
-                        •{" "}
-                        <span
-                          style={{
-                            padding: "2px 8px",
-                            borderRadius: 999,
-                            background:
-                              String(f.status).toLowerCase() === "closed"
-                                ? "#fdecea"
-                                : "#e8f5e9",
-                            color:
-                              String(f.status).toLowerCase() === "closed"
-                                ? "#c0392b"
-                                : "#2e7d32",
-                            fontWeight: 700,
-                          }}
-                        >
-                          {String(f.status || "active").toUpperCase()}
-                        </span>
-                      </span>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                      <div>
+                        <div style={{ fontWeight: 700 }}>
+                          {f.offence_type ? `${f.offence_type} — ${f.fullname}` : `FIR #${f.fir_id}`}
+                        </div>
+                        <div style={{ display: "flex", gap: 10, fontSize: 12, color: "#666" }}>
+                          <span>#{f.fir_id}</span>
+                          <span>• {f.incident_location || "—"}</span>
+                          <span>
+                            •{" "}
+                            <span
+                              style={{
+                                padding: "2px 8px",
+                                borderRadius: 999,
+                                background:
+                                  String(f.status).toLowerCase() === "closed" ? "#fdecea" : "#e8f5e9",
+                                color:
+                                  String(f.status).toLowerCase() === "closed" ? "#c0392b" : "#2e7d32",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {String(f.status || "active").toUpperCase()}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Escalate button same size as the Search button */}
+                      <SearchSizedBlueBtn
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          useForEscalation(f.fir_id);
+                          const esc = document.getElementById("escalate-section");
+                          if (esc) esc.scrollIntoView({ behavior: "smooth", block: "start" });
+                        }}
+                      />
                     </div>
                   </li>
                 ))}
@@ -221,17 +263,17 @@ export default function CitizenDashboard() {
           </section>
 
           {/* Escalate Case */}
-          <section style={{ ...cardStyle, marginTop: 20 }}>
+          <section id="escalate-section" style={{ ...cardStyle, marginTop: 20 }}>
             <div style={cardHeader}>
               <div style={cardTitle}>Escalate Case</div>
             </div>
 
             <p style={{ marginTop: 0, color: "#5b6b8c" }}>
               If you are not satisfied with the inquiry and your case has been closed, you may request
-              a review by submitting the FIR ID, your Aadhar number, and the reason for escalation.
+              a review by submitting the FIR ID and the reason for escalation. Your Aadhar is auto-filled.
             </p>
 
-            <form onSubmit={submitEscalation}>
+            <form onSubmit={submitEscalation} noValidate>
               <div style={grid2}>
                 <div>
                   <label>FIR ID</label>
@@ -239,7 +281,8 @@ export default function CitizenDashboard() {
                     className="modal-input"
                     value={escalate.fir_id}
                     onChange={(e) => setEscalate((p) => ({ ...p, fir_id: e.target.value }))}
-                    placeholder="Paste full FIR ID"
+                    placeholder="Paste or select a FIR ID"
+                    required
                   />
                 </div>
                 <div>
@@ -247,25 +290,36 @@ export default function CitizenDashboard() {
                   <input
                     className="modal-input"
                     value={escalate.aadhar_no}
-                    onChange={(e) => setEscalate((p) => ({ ...p, aadhar_no: e.target.value }))}
-                    placeholder="Your Aadhar (must match the FIR)"
+                    readOnly
+                    disabled
+                    placeholder="Your Aadhar (auto-filled)"
                   />
                 </div>
                 <div style={{ gridColumn: "1 / -1" }}>
                   <label>Reason / Description</label>
                   <textarea
+                    id="escalation-reason"
                     className="modal-input"
                     rows={4}
                     value={escalate.reason}
                     onChange={(e) => setEscalate((p) => ({ ...p, reason: e.target.value }))}
                     placeholder="Describe why you are requesting escalation…"
+                    required
                   />
                 </div>
               </div>
 
-              <div className="modal-actions" style={{ marginTop: 10 }}>
+              <div className="modal-actions" style={{ marginTop: 10, display: "flex", gap: 8 }}>
                 <button type="submit" className="btn-primary" disabled={escalating}>
                   {escalating ? "Submitting…" : "Escalate"}
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  disabled={escalating}
+                  onClick={() => setEscalate((p) => ({ ...p, fir_id: "", reason: "" }))}
+                >
+                  Clear
                 </button>
               </div>
 
@@ -307,20 +361,32 @@ export default function CitizenDashboard() {
 
                 <div className="fir-section" style={{ marginTop: 12 }}>
                   <div className="section-title">Latest Progress</div>
-                  {firDetail.progress ? (
+                  {Array.isArray(firDetail.progress) && firDetail.progress.length > 0 ? (
                     <div style={{ background: "#f7f8fc", border: "1px solid #eef0f6", borderRadius: 8, padding: 10 }}>
-                      {typeof firDetail.progress === "string" || typeof firDetail.progress === "number"
-                        ? String(firDetail.progress)
-                        : JSON.stringify(firDetail.progress)}
+                      <div><strong>Updated:</strong> {new Date(firDetail.progress[0].created_at).toLocaleString()}</div>
+                      {firDetail.progress[0].progress_text && <div>{firDetail.progress[0].progress_text}</div>}
+                      {firDetail.progress[0].evidence_text && <div><em>Evidence:</em> {firDetail.progress[0].evidence_text}</div>}
                     </div>
                   ) : (
                     <div style={{ color: "#777" }}>No progress recorded yet.</div>
                   )}
                 </div>
 
-                <div className="modal-actions" style={{ marginTop: 12 }}>
+                <div className="modal-actions" style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <button className="btn-secondary" onClick={() => setShowDetails(false)}>
                     Close
+                  </button>
+                  <button
+                    className="btn-primary"
+                    onClick={() => {
+                      useForEscalation(firDetail.fir_id);
+                      setShowDetails(false);
+                      const esc = document.getElementById("escalate-section");
+                      if (esc) esc.scrollIntoView({ behavior: "smooth", block: "start" });
+                    }}
+                    title="Use this FIR in the escalation form below"
+                  >
+                    Use this FIR for Escalation
                   </button>
                 </div>
               </>
@@ -374,4 +440,21 @@ const grid2 = {
   display: "grid",
   gridTemplateColumns: "1fr 1fr",
   gap: 10,
+};
+
+/* Match the "Search" button: bold white text, royal-blue pill, ~48px tall */
+const btnSearchSizedBlue = {
+  fontWeight: 700,
+  fontSize: 18,
+  lineHeight: 1,
+  color: "#fff",
+  padding: "12px 24px",   // approx 48px height like Search
+  borderRadius: 12,
+  border: "none",
+  background: "#1f3fae",
+  boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
+  cursor: "pointer",
+  transition: "background 120ms ease, transform 80ms ease",
+  userSelect: "none",
+  WebkitTapHighlightColor: "transparent",
 };

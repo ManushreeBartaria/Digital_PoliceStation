@@ -595,3 +595,5 @@ button:hover {
   width: auto;
   min-width: 110px;
 }
+.btn-ghost:hover { background: rgba(31,58,147,0.06); border-color: rgba(31,58,147,0.35); }
+.btn-ghost:active { transform: translateY(1px); }
