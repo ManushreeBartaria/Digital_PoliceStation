@@ -1,3 +1,4 @@
+
 # Digital Police Station & Public Safety Management System
 
 A modern web application built with React, TypeScript, and Tailwind CSS that aims to modernize case management, ensure tamper-proof FIR records, and improve accountability in the Indian police system.
@@ -143,4 +144,5 @@ IIC2.0/
 
 ### Database
 - PostgreSQL
+
 
